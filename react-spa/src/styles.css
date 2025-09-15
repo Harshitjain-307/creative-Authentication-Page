@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body { overflow-x: hidden; }
+body { margin: 0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+
+.modal-backdrop { @apply fixed inset-0 bg-black/60 flex items-center justify-center; }
+.card { @apply rounded-2xl border border-white/15 bg-white/5 shadow-xl backdrop-blur-md; }
+.btn { @apply inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/10 px-4 py-2 font-semibold hover:bg-white/20 transition; }
+.banner { @apply fixed top-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-xl font-extrabold tracking-wide; }
+.banner-ok { @apply bg-emerald-500/20 border border-emerald-400/60 text-emerald-200; }
+.banner-bad { @apply bg-rose-500/20 border border-rose-400/60 text-rose-200; }
+

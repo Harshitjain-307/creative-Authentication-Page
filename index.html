@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Creative Authentication — Interactive v6</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    /* ------------------ Base ------------------ */
+    *{margin:0;padding:0;box-sizing:border-box}
+    :root{
+      --bg:#0a0a0a;--fg:#ffffff;--muted:#c8c8c8;--p1:#ff6b9d;--p2:#4ecdc4;--p3:#45b7d1;--p4:#96ceb4;--p5:#feca57;
+      --card:rgba(255,255,255,.06);--card-border:rgba(255,255,255,.14);--glass:blur(10px)
+    }
+    html,body{height:100%}
+    body{font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:transparent;color:var(--fg);overflow-x:hidden}
+    .app{position:relative;min-height:100vh}
+
+    /* ------------------ Video BG ------------------ */
+    .video-bg{position:fixed;inset:0;z-index:-3;overflow:hidden}
+    .video-bg video{width:100%;height:100%;object-fit:cover;opacity:1;filter:none}
+    .video-dim{position:absolute;inset:0;background:
+      radial-gradient(1200px 600px at 20% 10%, rgba(10,10,10,.0), rgba(10,10,10,.12)),
+      linear-gradient(135deg, rgba(10,10,10,.18), rgba(26,26,46,.12) 35%, rgba(22,33,62,.12) 65%, rgba(10,10,10,.2));}
+
+    /* ------------------ Canvas FX ------------------ */
+    .fx-layer{position:fixed;inset:0;z-index:-2;pointer-events:none}
+    #particleCanvas{width:100%;height:100%;opacity:.6}
+    .holo-grid{position:absolute;inset:0;background-image:
+      linear-gradient(rgba(255,107,157,.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(78,205,196,.08) 1px, transparent 1px);
+      background-size:50px 50px;animation:gridMove 22s linear infinite;opacity:.2}
+    @keyframes gridMove{from{transform:translate(0,0)}to{transform:translate(50px,50px)}}
+
+    /* ------------------ Welcome ------------------ */
+    .welcome{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:3rem 1rem}
+    .welcome-inner{text-align:center;max-width:1100px;margin-inline:auto}
+    .title{font-family:Orbitron,monospace;font-weight:900;font-size:clamp(2.5rem,7vw,5.6rem);line-height:1.05;
+      background:linear-gradient(45deg,var(--p1),var(--p2),var(--p3));background-size:200% 200%;
+      -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:gradShift 3.2s ease-in-out infinite}
+    @keyframes gradShift{0%,100%{background-position:0 50%}50%{background-position:100% 50%}}
+    .subtitle{color:var(--muted);margin-top:.6rem}
+
+    .cards{margin-top:2rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1.25rem;justify-items:center}
+    .card{position:relative;isolation:isolate;border:1px solid var(--card-border);background:rgba(255,255,255,.02);
+      border-radius:20px;padding:1.4rem;backdrop-filter:var(--glass);cursor:pointer;transition:.25s transform,.25s box-shadow, .25s border-color;box-shadow:0 12px 40px rgba(0,0,0,.15)}
+    .card:hover{transform:translateY(-8px);border-color:var(--p1);box-shadow:0 26px 60px rgba(255,107,157,.25)}
+    .card:active{transform:translateY(-2px)}
+    .card .ico{font-size:2rem;margin-bottom:.6rem}
+    .card h3{font-family:Orbitron,monospace;font-size:1.2rem;margin-bottom:.25rem}
+    .card p{color:var(--muted);font-size:.95rem}
+
+    .divider{margin:2rem auto 0;max-width:780px;display:flex;align-items:center;gap:.8rem;color:var(--muted)}
+    .divider::before,.divider::after{content:"";flex:1;height:1px;background:rgba(255,255,255,.22)}
+
+    .row{margin-top:1rem;display:flex;flex-wrap:wrap;gap:.8rem;justify-content:center}
+    .btn{display:inline-flex;align-items:center;gap:.6rem;border:1px solid var(--card-border);
+      background:rgba(255,255,255,.06);padding:.9rem 1.2rem;border-radius:999px;cursor:pointer;transition:.2s;backdrop-filter:var(--glass)}
+    .btn:hover{transform:translateY(-2px);background:rgba(255,255,255,.12)}
+
+    /* Recent activity */
+    .activity{margin-top:2rem;border:1px solid var(--card-border);background:rgba(255,255,255,.02);
+      backdrop-filter:var(--glass);border-radius:16px;padding:1rem;text-align:left}
+    .activity h4{font-family:Orbitron,monospace;margin-bottom:.5rem}
+    .activity ul{list-style:none;max-height:160px;overflow:auto;}
+    .activity li{font-size:.9rem;color:var(--muted);padding:.3rem .2rem;border-bottom:1px dashed rgba(255,255,255,.08)}
+
+    /* ------------------ Screens ------------------ */
+    .screen{position:fixed;inset:0;background:transparent;display:none;flex-direction:column;z-index:12}
+    .screen.active{display:flex}
+    .screen-head{display:flex;align-items:center;gap:.8rem;padding:1rem 1.2rem;border-bottom:1px solid rgba(255,255,255,.12)}
+    .back{all:unset;cursor:pointer;color:var(--p1);font-weight:900;font-size:1.2rem;padding:.4rem .7rem;border-radius:999px}
+    .back:hover{background:rgba(255,107,157,.15)}
+    .screen-title{font-family:Orbitron,monospace}
+
+    .center{flex:1;display:flex;align-items:center;justify-content:center;padding:1.2rem;position:relative}
+    .center *{margin-left:auto;margin-right:auto}
+    #seq,#pGrid,#tttGrid,#symChoices{margin-inline:auto}
+
+    /* Gesture */
+    .g-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.2rem;width:min(68vmin,360px)}
+    .g-dot{width:90px;height:90px;border-radius:50%;border:3px solid rgba(255,255,255,.28);background:rgba(255,255,255,.06);transition:.2s}
+    .g-dot:hover{border-color:var(--p1);background:rgba(255,107,157,.12);transform:scale(1.06)}
+    .g-dot.on{border-color:var(--p2);background:rgba(78,205,196,.22);box-shadow:0 0 20px rgba(78,205,196,.55)}
+    #gestureCanvas{position:absolute;inset:0;pointer-events:none}
+
+    /* Form */
+    .form{width:min(420px,92vw);border:1px solid var(--card-border);background:rgba(255,255,255,.02);
+      backdrop-filter:var(--glass);border-radius:18px;padding:1.2rem 1.3rem;box-shadow:0 12px 40px rgba(0,0,0,.15)}
+    .group{margin-bottom:1rem}
+    .group label{display:block;color:var(--muted);margin-bottom:.4rem}
+    .group input{width:100%;padding:.85rem 1rem;border-radius:12px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.06);color:var(--fg)}
+    .group input:focus{outline:none;border-color:var(--p1);box-shadow:0 0 0 4px rgba(255,107,157,.18)}
+    .primary{all:unset;display:block;width:100%;text-align:center;margin-top:.4rem;padding:.9rem 1rem;border-radius:12px;background:linear-gradient(45deg,var(--p1),var(--p2));cursor:pointer;font-weight:800}
+
+    /* Success */
+    .success{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:transparent;z-index:30}
+    .success.active{display:flex}
+    .success-card{text-align:center;animation:pop .6s ease}
+    .spark{font-size:3.2rem;margin-bottom:.4rem;animation:bob 1.2s ease-in-out infinite}
+    @keyframes bob{50%{transform:translateY(-6px)}}
+    @keyframes pop{from{transform:scale(.9);opacity:0}to{transform:scale(1);opacity:1}}
+
+    /* Settings Drawer */
+    .drawer{position:fixed;right:16px;bottom:16px;z-index:25}
+    .panel{width:min(360px,92vw);max-height:75vh;overflow:auto;border:1px solid var(--card-border);
+      background:rgba(255,255,255,.02);backdrop-filter:var(--glass);border-radius:16px;padding:1rem;box-shadow:0 12px 40px rgba(0,0,0,.2);display:none}
+    .panel.show{display:block}
+    .panel h4{font-family:Orbitron,monospace;margin-bottom:.6rem}
+    .panel .row{justify-content:stretch}
+    .panel input[type="text"]{width:100%;padding:.7rem .9rem;border-radius:10px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.06);color:var(--fg)}
+    .panel .tip{color:var(--muted);font-size:.85rem}
+    .panel .grid{display:grid;grid-template-columns:1fr auto;gap:.6rem;align-items:center}
+    .ghost{all:unset;border:1px dashed rgba(255,255,255,.3);border-radius:10px;padding:.6rem .8rem;cursor:pointer}
+
+    /* Audio control */
+    .audio-fab{position:fixed;left:16px;bottom:16px;z-index:26;border:1px solid var(--card-border);background:rgba(255,255,255,.1);
+      backdrop-filter:var(--glass);border-radius:999px;padding:.6rem .9rem;cursor:pointer}
+    .audio-fab:hover{background:rgba(255,255,255,.18)}
+
+    @media (max-width:720px){
+      .g-dot{width:64px;height:64px}
+      .g-grid{gap:.9rem;width:min(82vmin,320px)}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- ===== Video Background ===== -->
+    <div class="video-bg">
+      <video id="bgVideo" autoplay muted loop playsinline>
+        <source src="your-video.mp4" type="video/mp4">
+      </video>
+      <div class="video-dim"></div>
+    </div>
+
+    <!-- Background audio -->
+    <audio id="bgAudio" loop>
+      <source src="your-sound.mp3" type="audio/mp3">
+    </audio>
+    <button id="audioToggle" class="audio-fab">🔈 Sound</button>
+
+    <!-- FX -->
+    <div class="fx-layer">
+      <canvas id="particleCanvas"></canvas>
+      <div class="holo-grid"></div>
+    </div>
+
+    <!-- ===== Welcome ===== -->
+    <section class="welcome" id="welcome">
+      <div class="welcome-inner">
+        <h1 class="title" id="title">Creative Authentication</h1>
+        <p class="subtitle">Choose your unique way to unlock</p>
+
+        <div class="cards" id="methodCards">
+          <div class="card" data-screen="gesture"><div class="ico">👆</div><h3>Gesture Unlock</h3><p>Draw your secret pattern</p></div>
+          <div class="card" data-screen="doodle"><div class="ico">🎨</div><h3>Doodle Unlock</h3><p>Create your signature</p></div>
+          <div class="card" data-screen="game"><div class="ico">🎮</div><h3>Dots Memory</h3><p>Memorize & repeat</p></div>
+          <div class="card" data-screen="simon"><div class="ico">🎵</div><h3>Simon Says</h3><p>Follow the sequence</p></div>
+          <div class="card" data-screen="pattern"><div class="ico">🧩</div><h3>Pattern Memory</h3><p>Remember the pattern</p></div>
+          <div class="card" data-screen="dice"><div class="ico">🎲</div><h3>Dice 7</h3><p>Roll a seven to enter</p></div>
+          <div class="card" data-screen="tictactoe"><div class="ico">❌</div><h3>Tic-Tac-Toe</h3><p>Win a quick game</p></div>
+          <div class="card" data-screen="rps"><div class="ico">🪨</div><h3>Rock-Paper-Scissors</h3><p>Beat the bot</p></div>
+          <div class="card" data-screen="chess"><div class="ico">♟️</div><h3>Mate in 2</h3><p>Pick the right line</p></div>
+          <div class="card" data-screen="symbols"><div class="ico">🔶</div><h3>Last Symbol</h3><p>Match the last symbol</p></div>
+          <div class="card" data-screen="voice"><div class="ico">🎤</div><h3>Voice Access</h3><p>Say your phrase</p></div>
+          <div class="card" data-screen="handgesture"><div class="ico">✋</div><h3>Hand Gesture</h3><p>Show your hand sign</p></div>
+          <div class="card" data-screen="face"><div class="ico">👁️</div><h3>Face Detection</h3><p>Look at the camera</p></div>
+          <div class="card" data-screen="username"><div class="ico">👤</div><h3>Username & Password</h3><p>Classic login</p></div>
+        </div>
+
+        <div class="divider"><span>or continue with</span></div>
+        <div class="row">
+          <button class="btn" id="googleBtn" aria-label="Continue with Google">
+            <!-- Google G -->
+            <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+              <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303C33.826 31.658 29.27 35 24 35c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.601 5.012 29.584 3 24 3 12.955 3 4 11.955 4 23s8.955 20 20 20 19-9 19-20c0-1.341-.138-2.651-.389-3.917z"/>
+              <path fill="#FF3D00" d="M6.306 14.691l6.571 4.815C14.38 16.108 18.824 13 24 13c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.601 5.012 29.584 3 24 3 16.318 3 9.656 7.337 6.306 14.691z"/>
+              <path fill="#4CAF50" d="M24 43c5.17 0 9.86-1.977 13.409-5.186l-6.196-5.238C29.155 34.091 26.715 35 24 35c-5.241 0-9.781-3.317-11.298-7.946l-6.54 5.036C9.468 38.556 16.227 43 24 43z"/>
+              <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303c-1.076 3.154-3.652 5.64-6.894 6.577l6.196 5.238C36.271 41.428 43 37 43 23c0-1.341-.138-2.651-.389-3.917z"/>
+            </svg>
+            <span>Continue with Google</span>
+          </button>
+          <button class="btn" data-screen="username">👤 Username & Password</button>
+        </div>
+
+        <!-- Recent activity log -->
+        <div class="activity" id="activity">
+          <h4>Recent Activity</h4>
+          <ul id="activityList"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Gesture ===== -->
+    <section class="screen" id="gesture">
+      <div class="screen-head"><button class="back">←</button><h3 class="screen-title">Gesture Unlock</h3></div>
+      <div class="center" style="flex-direction:column;gap:1rem">
+        <div class="g-grid" id="gGrid"></div>
+        <canvas id="gestureCanvas"></canvas>
+        <div class="row">
+          <button class="btn" id="gestureReset">Reset</button>
+          <button class="btn" id="gestureSubmit">Submit</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Doodle ===== -->
+    <section class="screen" id="doodle">
+      <div class="screen-head"><button class="back">←</button><h3 class="screen-title">Doodle Unlock</h3></div>
+      <div class="center" style="flex-direction:column;gap:1rem">
+        <canvas id="doodleCanvas" width="420" height="420" style="border-radius:16px;border:2px solid rgba(255,255,255,.2);background:rgba(255,255,255,.03)"></canvas>
+        <div class="row">
+          <input id="brushSize" type="range" min="1" max="14" value="4"/>
+          <input id="brushColor" type="color" value="#ff6b9d"/>
+          <button class="btn" id="clearDoodle">Clear</button>
+          <button class="btn" id="doodleReset">Reset</button>
+          <button class="btn" id="submitDoodle">Submit</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Dots Memory Game ===== -->
+    <section class="screen" id="game">
+      <div class="screen-head"><button class="back">←</button><h3 class="screen-title">Dots Memory</h3></div>
+      <div class="center" style="flex-direction:column">
+        <div id="seq" style="display:grid;grid-template-columns:repeat(4,64px);gap:12px"></div>
+        <div class="row">
+          <button class="btn" id="startGame">Start</button>
+          <button class="btn" id="resetGame">Reset</button>
+          <button class="btn" id="submitGame">Submit</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Simon ===== -->
+    <section class="screen" id="simon">
+      <div class="screen-head"><button class="back">←</button><h3 class="screen-title">Simon Says</h3></div>
+      <div class="center" style="flex-direction:column;gap:1rem">
+        <div style="display:grid;grid-template-columns:repeat(2,120px);gap:14px">
+          <button class="btn sim" data-col="red"   style="background:linear-gradient(45deg,#ff4757,#ff6b7a)">Red</button>
+          <button class="btn sim" data-col="blue"  style="background:linear-gradient(45deg,#3742fa,#5352ed)">Blue</button>
+          <button class="btn sim" data-col="green" style="background:linear-gradient(45deg,#2ed573,#7bed9f)">Green</button>
+          <button class="btn sim" data-col="yellow"style="background:linear-gradient(45deg,#ffa502,#ffb142)">Yellow</button>
+        </div>
+        <div class="row">
+          <button class="btn" id="simonStart">Start</button>
+          <button class="btn" id="simonReset">Reset</button>
+          <button class="btn" id="simonSubmit">Submit</button>
+          <span>Level: <b id="lvl">1</b></span>
+          <span>Score: <b id="scr">0</b></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Pattern Memory ===== -->
+    <section class="screen" id="pattern">
+      <div class="screen-head"><button class="back">←</button><h3 class="screen-title">Pattern Memory</h3></div>
+      <div class="center" style="flex-direction:column;gap:1rem">
+        <div id="pGrid" style="display:grid;gap:8px"></div>
+        <div class="row">
+          <label>Difficulty</label>
+          <select id="diff">
+            <option value="easy">Easy (3x3)</option>
+            <option value="medium">Medium (4x4)</option>
+            <option value="hard">Hard (5x5)</option>
+          </select>
+          <span>Time: <b id="ptime">10</b>s</span>
+        </div>
+        <div class="row">
+          <button class="btn" id="pStart">Start</button>
+          <button class="btn" id="pReset">Reset</button>
+          <button class="btn" id="pSubmit">Submit</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Dice 7 ===== -->
+    <section class="screen" id="dice">
+      <div class="screen-head"><button class="back">←</button><h3 class="screen-title">Dice — Roll a 7</h3></div>
+      <div class="center" style="flex-direction:column;gap:1rem">
+        <div id="diceView" style="font-size:3rem">🎲 🎲</div>
+        <div class="row">
+          <button class="btn" id="rollDice">Roll</button>
+          <button class="btn" id="diceSubmit">Submit</button>
+        </div>
+        <div id="diceMsg" style="color:var(--muted)"></div>
+      </div>
+    </section>
+
+    <!-- ===== Tic Tac Toe ===== -->
+    <section class="screen" id="tictactoe">
+      <div class="screen-head"><button class="back">←</button><h3 class="screen-title">Tic-Tac-Toe</h3></div>
+      <div class="center" style="flex-direction:column;gap:1rem">
+        <div id="tttGrid" style="display:grid;grid-template-columns:repeat(3,80px);gap:10px"></div>
+        <div class="row">
+          <button class="btn" id="tttReset">Reset</button>
+          <button class="btn" id="tttSubmit">Submit</button>
+        </div>
+        <div id="tttMsg" style="color:var(--muted)">You are X. First to 3 in a row wins.</div>
+      </div>
+    </section>
+
+    <!-- ===== Rock-Paper-Scissors ===== -->
+    <section class="screen" id="rps">
+      <div class="screen-head"><button class="back">←</button><h3 class="screen-title">Rock-Paper-Scissors</h3></div>
+      <div class="center" style="flex-direction:column;gap:1rem">
+        <div class="row">
+          <button class="btn rps" data-move="rock">🪨 Rock</button>
+          <button class="btn rps" data-move="paper">📄 Paper</button>
+          <button class="btn rps" data-move="scissors">✂️ Scissors</button>
+        </div>
+        <div id="rpsMsg" style="color:var(--muted)"></div>
+      </div>
+    </section>
+
+    <!-- ===== Chess (Mate in 2) ===== -->
+    <section class="screen" id="chess">
+      <div class="screen-head"><button class="back">←</button><h3 class="screen-title">Chess — Mate in 2 (White to move)</h3></div>
+      <div class="center" style="flex-direction:column;gap:1rem">
+        <div style="max-width:520px;color:var(--muted);text-align:center">
+          Choose the correct two-move sequence to checkmate.
+        </div>
+        <div class="row" style="flex-direction:column;align-items:stretch;width:min(520px,92vw)">
+          <button class="btn line" data-line="A">1.Qh5+ g6 2.Qe5#</button>
+          <button class="btn line" data-line="B">1.Qg4+ Kh8 2.Qg7#</button>
+          <button class="btn line" data-line="C">1.Qf6+ Kg8 2.Qg7#</button>
+          <button class="btn line" data-line="D">1.Bxh7+ Kxh7 2.Qh5+</button>
+        </div>
+        <div id="chessMsg" style="color:var(--muted)"></div>
+      </div>
+    </section>
+
+    <!-- ===== Last Symbol Match ===== -->
+    <section class="screen" id="symbols">
+      <div class="screen-head"><button class="back">←</button><h3 class="screen-title">Last Symbol Match</h3></div>
+      <div class="center" style="flex-direction:column;gap:1rem">
+        <div id="symShow" style="font-size:2rem"></div>
+        <div class="row" id="symChoices"></div>
+        <div class="row">
+          <button class="btn" id="symReset">Reset</button>
+        </div>
+        <div id="symMsg" style="color:var(--muted)"></div>
+      </div>
+    </section>
+
+    <!-- ===== Username ===== -->
+    <section class="screen" id="username">
+      <div class="screen-head"><button class="back">←</button><h3 class="screen-title">Username & Password</h3></div>
+      <div class="center">
+        <form class="form" onsubmit="return false">
+          <div class="group"><label>Username</label><input id="uname" placeholder="Enter username" /></div>
+          <div class="group"><label>Password</label><input id="upass" type="password" placeholder="Enter password" /></div>
+          <button class="primary" id="loginBtn">Login</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- ===== Voice ===== -->
+    <section class="screen" id="voice">
+      <div class="screen-head"><button class="back">←</button><h3 class="screen-title">Voice Access</h3></div>
+      <div class="center" style="flex-direction:column;gap:1rem">
+        <div class="row">
+          <button class="btn" id="startVoice">🎤 Start</button>
+          <button class="btn" id="stopVoice">⏹️ Stop</button>
+          <button class="btn" id="voiceSubmit">Submit</button>
+          <button class="btn" id="voiceReset">Reset</button>
+        </div>
+        <div class="row" style="color:var(--muted)">Say the exact phrase you set in Settings. Default is “open”.</div>
+        <div id="voiceOut" class="row" style="font-weight:700"></div>
+      </div>
+    </section>
+
+    <!-- ===== Hand Gesture ===== -->
+    <section class="screen" id="handgesture">
+      <div class="screen-head"><button class="back">←</button><h3 class="screen-title">Hand Gesture Recognition</h3></div>
+      <div class="center" style="flex-direction:column;gap:1rem">
+        <video id="handVideo" autoplay muted playsinline style="width:420px;height:315px;border-radius:12px;border:2px solid rgba(255,255,255,.2)"></video>
+        <canvas id="handCanvas" style="position:absolute;pointer-events:none"></canvas>
+        <div class="row">
+          <button class="btn" id="startHandCamera">📷 Start Camera</button>
+          <button class="btn" id="stopHandCamera">⏹️ Stop</button>
+          <button class="btn" id="handReset">Reset</button>
+          <button class="btn" id="handSubmit">Submit</button>
+        </div>
+        <div id="handStatus" style="color:var(--muted)">Show a peace ✌️ or thumbs up 👍 — sustained motion & skin tones unlock.</div>
+      </div>
+    </section>
+
+    <!-- ===== Face Detection ===== -->
+    <section class="screen" id="face">
+      <div class="screen-head"><button class="back">←</button><h3 class="screen-title">Face Detection</h3></div>
+      <div class="center" style="flex-direction:column;gap:1rem">
+        <video id="faceVideo" autoplay muted playsinline style="width:420px;height:315px;border-radius:12px;border:2px solid rgba(255,255,255,.2)"></video>
+        <canvas id="faceCanvas" style="position:absolute;pointer-events:none"></canvas>
+        <div class="row">
+          <button class="btn" id="startFaceCamera">📷 Start Camera</button>
+          <button class="btn" id="stopFaceCamera">⏹️ Stop</button>
+          <button class="btn" id="faceReset">Reset</button>
+          <button class="btn" id="faceSubmit">Submit</button>
+        </div>
+        <div id="faceStatus" style="color:var(--muted)">Align face — exact verification required.</div>
+      </div>
+    </section>
+
+    <!-- ===== Success ===== -->
+    <section class="success" id="success">
+      <div class="success-card">
+        <div class="spark">✨</div>
+        <h2 class="title" style="font-size:2.2rem">Access Granted!</h2>
+        <p class="subtitle">Welcome to the future of authentication</p>
+        <div class="row" style="margin-top:1rem"><button class="btn" id="continue">Continue</button></div>
+      </div>
+    </section>
+
+    <!-- ===== Settings (Video + Voice phrase) ===== -->
+    <div class="drawer">
+      <div class="btn" id="openSettings">⚙️ Settings</div>
+      <div class="panel" id="settings">
+        <h4>Background Video</h4>
+        <div class="grid">
+          <input id="videoUrl" type="text" placeholder="Paste MP4/WebM URL here (https://...)"/>
+          <button class="ghost" id="applyUrl">Use URL</button>
+        </div>
+        <div class="row" style="margin-top:.6rem;justify-content:space-between">
+          <label class="ghost" for="videoFile">Choose file…</label>
+          <input id="videoFile" type="file" accept="video/mp4,video/webm" style="display:none"/>
+          <button class="ghost" id="clearVideo">Clear video</button>
+        </div>
+        <hr style="margin:.9rem 0;border:0;border-top:1px dashed rgba(255,255,255,.18)"/>
+        <h4>Security Settings</h4>
+        <div class="grid">
+          <input id="voicePhrase" type="text" placeholder="Voice passphrase (default: open)"/>
+          <button class="ghost" id="savePhrase">Save</button>
+        </div>
+        <p class="tip" style="margin-top:.6rem">Only exact phrase will grant access in Voice mode. Saved locally.</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  /* ===== Helpers ===== */
+  const $ = s => document.querySelector(s);
+  const $$ = s => Array.from(document.querySelectorAll(s));
+  function logActivity(msg){
+    const ul = document.getElementById('activityList');
+    if(!ul) return;
+    const li = document.createElement('li');
+    const t = new Date().toLocaleTimeString();
+    li.textContent = `[${t}] ${msg}`;
+    ul.prepend(li);
+  }
+
+  /* ===== Audio ===== */
+  const bgAudio = $('#bgAudio');
+  const audioToggle = $('#audioToggle');
+  let audioWanted = false;
+  function tryPlayAudio(){ if(audioWanted && bgAudio.paused) bgAudio.play().catch(()=>{}); }
+  window.addEventListener('pointerdown', ()=>tryPlayAudio(), {once:true});
+  audioToggle.onclick = ()=>{
+    audioWanted = !audioWanted;
+    audioToggle.textContent = audioWanted ? '🔊 Sound' : '🔈 Sound';
+    if(audioWanted){ tryPlayAudio(); } else { bgAudio.pause(); }
+  };
+
+  /* ===== Video source ===== */
+  const bgVideo = $('#bgVideo');
+  const LS_KEY = 'creative-auth-video';
+  const saved = localStorage.getItem(LS_KEY);
+  if(saved){ setVideoSrc(saved); }
+  $('#applyUrl').onclick = ()=>{
+    const u = $('#videoUrl').value.trim();
+    if(u){ localStorage.setItem(LS_KEY,u); setVideoSrc(u); }
+  };
+  $('#videoFile').onchange = e=>{
+    const f = e.target.files?.[0];
+    if(!f) return;
+    const url = URL.createObjectURL(f);
+    localStorage.setItem(LS_KEY,url);
+    setVideoSrc(url);
+  };
+  $('#clearVideo').onclick = ()=>{ localStorage.removeItem(LS_KEY); setVideoSrc(null); };
+  $('#openSettings').onclick = ()=> $('#settings').classList.toggle('show');
+  function setVideoSrc(src){
+    if(!src){ bgVideo.removeAttribute('src'); bgVideo.load(); return; }
+    bgVideo.src = src; bgVideo.load(); bgVideo.play().catch(()=>{});
+  }
+
+  /* ===== Router ===== */
+  function openScreen(id){
+    $('#welcome').style.display='none';
+    $('.screen.active')?.classList.remove('active');
+    const s = document.getElementById(id);
+    s.classList.add('active');
+    s.style.opacity = 0; s.style.transform='translateY(12px)';
+    requestAnimationFrame(()=>{ s.style.transition='all .35s ease'; s.style.opacity=1; s.style.transform='translateY(0)'; });
+  }
+  function goHome(){ $('.screen.active')?.classList.remove('active'); $('#welcome').style.display='block'; }
+  $$('#methodCards .card, .row .btn[data-screen]').forEach(c=>c.addEventListener('click',()=>openScreen(c.dataset.screen)));
+  $$('.back').forEach(b=>b.addEventListener('click',goHome));
+
+  /* ===== Success flow ===== */
+  function grant(){ logActivity('Access granted'); $('.screen.active')?.classList.remove('active'); $('#success').classList.add('active'); }
+  $('#continue').onclick = ()=>{ $('#success').classList.remove('active'); goHome(); };
+
+  /* ===== Gesture Unlock ===== */
+  const gGrid = $('#gGrid'), gCanvas = $('#gestureCanvas'), gCtx = gCanvas.getContext('2d');
+  const gDots=[]; let gActive=false; let gPath=[];
+  function sizeGesture(){ const r=gGrid.getBoundingClientRect(); gCanvas.width=r.width; gCanvas.height=r.height; }
+  window.addEventListener('resize', sizeGesture);
+  (()=>{ for(let i=1;i<=9;i++){ const d=document.createElement('div'); d.className='g-dot'; d.dataset.dot=i; gGrid.appendChild(d); gDots.push(d); } sizeGesture(); })();
+  gDots.forEach(d=>{
+    d.addEventListener('pointerdown',()=>{ gActive=true; gPath=[+d.dataset.dot]; gDots.forEach(x=>x.classList.remove('on')); d.classList.add('on'); drawGesture(); });
+    d.addEventListener('pointerenter',()=>{ if(!gActive) return; const n=+d.dataset.dot; if(!gPath.includes(n)){ gPath.push(n); d.classList.add('on'); drawGesture(); } });
+  });
+  window.addEventListener('pointerup', ()=>{ if(!gActive) return; gActive=false; if(gPath.length<3){ resetGesture(); } });
+  function drawGesture(){
+    gCtx.clearRect(0,0,gCanvas.width,gCanvas.height);
+    if(gPath.length<2) return;
+    gCtx.strokeStyle='#4ecdc4'; gCtx.lineWidth=4; gCtx.lineCap='round';
+    gCtx.beginPath();
+    gPath.forEach((idx,i)=>{
+      const dot=gDots[idx-1], dr=dot.getBoundingClientRect(), gr=gGrid.getBoundingClientRect();
+      const x=dr.left-gr.left+dr.width/2, y=dr.top-gr.top+dr.height/2;
+      i?gCtx.lineTo(x,y):gCtx.moveTo(x,y);
+    });
+    gCtx.stroke();
+  }
+  function resetGesture(){ gPath=[]; gCtx.clearRect(0,0,gCanvas.width,gCanvas.height); gDots.forEach(x=>x.classList.remove('on')); }
+  $('#gestureReset').onclick=resetGesture;
+  $('#gestureSubmit').onclick=()=>{ if(gPath.length>=3) grant(); else alert('Draw at least 3 dots'); };
+
+  /* ===== Doodle ===== */
+  const dCan=$('#doodleCanvas'), dCtx=dCan.getContext('2d');
+  let drawing=false, last=[0,0];
+  dCtx.lineJoin='round'; dCtx.lineCap='round';
+  dCtx.strokeStyle=$('#brushColor').value; dCtx.lineWidth=$('#brushSize').value;
+  function pos(e){ const r=dCan.getBoundingClientRect(); return [ (e.clientX ?? e.touches[0].clientX)-r.left, (e.clientY ?? e.touches[0].clientY)-r.top ]; }
+  dCan.addEventListener('pointerdown',e=>{ drawing=true; last=pos(e); });
+  dCan.addEventListener('pointermove',e=>{ if(!drawing) return; const p=pos(e); dCtx.beginPath(); dCtx.moveTo(...last); dCtx.lineTo(...p); dCtx.stroke(); last=p; });
+  window.addEventListener('pointerup',()=>drawing=false);
+  $('#brushColor').oninput=e=>dCtx.strokeStyle=e.target.value;
+  $('#brushSize').oninput=e=>dCtx.lineWidth=+e.target.value;
+  $('#clearDoodle').onclick=()=>dCtx.clearRect(0,0,dCan.width,dCan.height);
+  $('#doodleReset').onclick=()=>{ dCtx.clearRect(0,0,dCan.width,dCan.height); $('#brushColor').value='#ff6b9d'; dCtx.strokeStyle='#ff6b9d'; $('#brushSize').value=4; dCtx.lineWidth=4; };
+  $('#submitDoodle').onclick=()=>{
+    const {data}=dCtx.getImageData(0,0,dCan.width,dCan.height);
+    const has = data.some(v=>v!==0);
+    has?grant():alert('Please draw something first!');
+  };
+
+  /* ===== Dots Memory Game ===== */
+  const seq=$('#seq'); let gSeq=[], gUser=[], gRun=false;
+  const dotBtns=[];
+  for(let i=0;i<8;i++){ const b=document.createElement('button'); b.className='btn'; b.style.width='64px'; b.style.height='64px'; b.dataset.idx=i; seq.appendChild(b); dotBtns.push(b); b.onclick=()=>handleGuess(i,b); b.disabled=true; }
+  $('#startGame').onclick=()=>{ gRun=true; gUser=[]; gSeq = Array.from({length: Math.floor(Math.random()*3)+4}, ()=>Math.floor(Math.random()*8)); showSeq(); logActivity('Dots game started'); };
+  $('#resetGame').onclick=resetGame;
+  $('#submitGame').onclick=()=>{ if(gUser.length && arraysEqual(gUser,gSeq)) { grant(); } else alert('Sequence incorrect'); };
+  function showSeq(){
+    dotBtns.forEach(b=>b.disabled=true);
+    gSeq.forEach((idx,i)=>setTimeout(()=>{ flash(dotBtns[idx]); if(i===gSeq.length-1) setTimeout(()=>dotBtns.forEach(b=>b.disabled=false), 550); }, i*600));
+  }
+  function flash(el){ el.style.outline='3px solid '+randColor(); setTimeout(()=>el.style.outline='none', 420); }
+  function handleGuess(i,btn){
+    if(!gRun) return;
+    gUser.push(i);
+    flash(btn);
+  }
+  function resetGame(){ gRun=false; gSeq=[]; gUser=[]; dotBtns.forEach(b=>{b.disabled=true; b.style.outline='none';}); }
+  function arraysEqual(a,b){ return a.length===b.length && a.every((v,i)=>v===b[i]); }
+
+  /* ===== Simon Says ===== */
+  let sSeq=[], sUser=[], sLvl=1, sScore=0, sOn=false; const sBtns=$$('.sim');
+  $('#simonStart').onclick=()=>{ sOn=true; sSeq=[]; sUser=[]; sLvl=1; sScore=0; updateSimon(); addStep(); playSimon(); };
+  $('#simonReset').onclick=()=>{ resetSimon(); };
+  $('#simonSubmit').onclick=()=>{ if(sUser.length) grant(); else alert('Play or submit after some inputs.'); };
+  function addStep(){ const cols=['red','blue','green','yellow']; sSeq.push(cols[Math.random()*cols.length|0]); }
+  function playSimon(){ sUser=[]; let t=0; sSeq.forEach(c=>{ setTimeout(()=>{ const b=sBtns.find(x=>x.dataset.col===c); pulse(b); }, t); t+=600; }); }
+  function pulse(b){ const old=b.style.transform; b.style.transform='scale(.96)'; setTimeout(()=>b.style.transform=old,300); }
+  sBtns.forEach(b=>b.onclick=()=>{ if(!sOn) return; sUser.push(b.dataset.col); pulse(b);
+    const i=sUser.length-1;
+    if(sUser[i]!==sSeq[i]){ resetSimon(); return; }
+    if(sUser.length===sSeq.length){ sScore+=sLvl*10; sLvl++; updateSimon(); if(sLvl>5){ grant(); } else { setTimeout(()=>{ addStep(); playSimon(); }, 700); } }
+  });
+  function updateSimon(){ $('#lvl').textContent=sLvl; $('#scr').textContent=sScore; }
+  function resetSimon(){ sOn=false; sSeq=[]; sUser=[]; sLvl=1; sScore=0; updateSimon(); }
+
+  /* ===== Pattern Memory ===== */
+  const pGrid=$('#pGrid'); let dim=3, pSeq=[], pUser=[], pTimer=10, pLive=false, pInt=null;
+  buildGrid(); $('#diff').onchange=e=>{ dim = e.target.value==='easy'?3 : e.target.value==='medium'?4 : 5; buildGrid(); resetPattern(); };
+  $('#pStart').onclick=()=>{ startPattern(); };
+  $('#pReset').onclick=()=>{ resetPattern(); };
+  $('#pSubmit').onclick=()=>{ if(pUser.length) grant(); else alert('Start game and click cells to repeat the pattern.'); };
+  function buildGrid(){
+    pGrid.innerHTML=''; pGrid.style.gridTemplateColumns=`repeat(${dim}, min(72px,14vmin))`;
+    for(let i=0;i<dim*dim;i++){ const c=document.createElement('button'); c.className='btn'; c.dataset.i=i; c.style.height='72px'; c.disabled=true;
+      c.onclick=()=>{ if(!pLive) return; pUser.push(i); c.style.outline='3px solid '+randColor(); setTimeout(()=>c.style.outline='none', 300);
+        if(pUser.length===pSeq.length){ const ok=pUser.every((v,j)=>v===pSeq[j]); ok?grant():resetPattern(); }
+      };
+      pGrid.appendChild(c);
+    }
+  }
+  function startPattern(){
+    resetPattern();
+    const cells=[...pGrid.children]; const L=Math.floor(cells.length/3)+2;
+    for(let i=0;i<L;i++) pSeq.push(Math.random()*cells.length|0);
+    pSeq.forEach((idx,k)=>setTimeout(()=>{ cells[idx].style.outline='3px solid '+randColor(); setTimeout(()=>cells[idx].style.outline='none', 380); }, k*420));
+    pTimer=10; $('#ptime').textContent=pTimer; clearInterval(pInt);
+    pInt=setInterval(()=>{ pTimer--; $('#ptime').textContent=pTimer; if(pTimer<=0){ clearInterval(pInt); pLive=true; cells.forEach(c=>c.disabled=false); } }, 1000);
+  }
+  function resetPattern(){
+    pLive=false; pSeq=[]; pUser=[]; $('#ptime').textContent='10';
+    [...pGrid.children].forEach(c=>{ c.style.outline='none'; c.disabled=true; });
+    clearInterval(pInt);
+  }
+
+  /* ===== Username & Google (simulated) ===== */
+  $('#loginBtn').onclick=()=>{ const u=$('#uname').value.trim(); const p=$('#upass').value.trim(); if(u && p) { logActivity('Password login'); grant(); } else alert('Please enter both username and password'); };
+  $('#googleBtn').onclick=()=>{ const b=$('#googleBtn'); b.textContent='Signing in…'; b.disabled=true; setTimeout(()=>{ logActivity('Google login'); grant(); },1200); };
+
+  /* ===== Chess logic (Mate in 2) ===== */
+  const correctLine='C';
+  $$('.line').forEach(btn=>btn.addEventListener('click',()=>{
+    const pick=btn.dataset.line;
+    if(pick===correctLine){ $('#chessMsg').textContent='Correct! Mate in two found.'; logActivity('Chess: correct line'); setTimeout(grant,300); }
+    else { $('#chessMsg').textContent='Not quite. Try another line.'; }
+  }));
+
+  /* ===== Voice Recognition (STRICT MATCH) ===== */
+  let rec = null, listening=false, lastSaid='';
+  const PHRASE_KEY='creative-auth-voice-phrase';
+  function getPhrase(){ return (localStorage.getItem(PHRASE_KEY) || 'open').toLowerCase().trim(); }
+  $('#savePhrase').onclick=()=>{ const v=$('#voicePhrase').value.trim(); if(v){ localStorage.setItem(PHRASE_KEY,v.toLowerCase()); logActivity('Voice phrase saved'); } };
+  if('webkitSpeechRecognition' in window || 'SpeechRecognition' in window){
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    rec = new SR(); rec.continuous=false; rec.interimResults=false; rec.lang='en-US';
+    rec.onstart=()=>{ listening=true; $('#voiceOut').textContent='Listening...'; };
+    rec.onresult=(e)=>{ lastSaid = e.results[0][0].transcript.toLowerCase().trim(); $('#voiceOut').textContent='You said: "'+lastSaid+'"';
+      if(lastSaid===getPhrase()) setTimeout(grant,300);
+    };
+    rec.onerror=()=>{ $('#voiceOut').textContent='Speech error'; listening=false; };
+    rec.onend=()=>{ listening=false; };
+  }
+  $('#startVoice').onclick=()=>{ if(rec && !listening){ rec.start(); } else { alert('Speech recognition not supported in this browser'); } };
+  $('#stopVoice').onclick = ()=>{ if(rec && listening) rec.stop(); };
+  $('#voiceSubmit').onclick = ()=>{ if(lastSaid===getPhrase()){ grant(); } else { alert('Passphrase mismatch'); } };
+  $('#voiceReset').onclick = ()=>{ if(rec && listening) rec.stop(); lastSaid=''; $('#voiceOut').textContent=''; };
+
+  /* ===== Hand Gesture (simple heuristic) ===== */
+  const hVid = $('#handVideo'), hCan=$('#handCanvas'), hCtx=hCan.getContext('2d');
+  let hStream=null, hRun=false, hPrev=null, hScore=0;
+  $('#startHandCamera').onclick = async ()=>{
+    await stopStream(hStream);
+    try{
+      const constraints = [{video:{width:640,height:480,facingMode:'user'}},{video:true}];
+      hStream = await getFirstWorking(constraints);
+      hVid.srcObject = hStream;
+      await hVid.play();
+      sizeOverlay(hVid,hCan);
+      hRun=true; hScore=0; hPrev=null;
+      $('#handStatus').textContent='Camera started — hold your hand, make a clear gesture';
+      handLoop();
+    }catch(e){ $('#handStatus').textContent='Cannot start camera: '+e.message; }
+  };
+  $('#stopHandCamera').onclick = async ()=>{ await stopStream(hStream); hRun=false; hCtx.clearRect(0,0,hCan.width,hCan.height); $('#handStatus').textContent='Camera stopped'; };
+  $('#handReset').onclick = async ()=>{ hScore=0; hPrev=null; $('#handStatus').textContent='Reset done. Start camera again if needed.'; };
+  $('#handSubmit').onclick = ()=>grant();
+  function handLoop(){
+    if(!hRun) return;
+    try{
+      hCtx.drawImage(hVid,0,0,hCan.width,hCan.height);
+      const img = hCtx.getImageData(0,0,hCan.width,hCan.height);
+      const skin = estimateSkinRatio(img.data);
+      const motion = hPrev ? estimateMotion(img.data,hPrev) : 0;
+      hPrev = new Uint8ClampedArray(img.data);
+      if(skin>0.06 && motion>0.02){ hScore++; drawHUD(hCtx,hCan,true); } else { hScore=Math.max(0,hScore-1); drawHUD(hCtx,hCan,false); }
+      if(hScore>18){ $('#handStatus').textContent='Gesture recognized!'; setTimeout(grant,300); hRun=false; }
+      else { $('#handStatus').textContent=`Hold still & gesture — progress ${hScore}/18`; }
+    }catch{}
+    requestAnimationFrame(handLoop);
+  }
+  function drawHUD(ctx,can,ok){ ctx.strokeStyle = ok?'#4ecdc4':'#ff6b9d'; ctx.lineWidth=3; ctx.strokeRect(30,30,can.width-60,can.height-60); }
+
+  /* ===== Face Detection (STRICT: must be verified before submit) ===== */
+  const fVid = $('#faceVideo'), fCan=$('#faceCanvas'), fCtx=fCan.getContext('2d');
+  let fStream=null, fRun=false, fPrev=null, fScore=0; const FACE_OK=26;
+  $('#startFaceCamera').onclick = async ()=>{
+    await stopStream(fStream);
+    try{
+      const constraints=[{video:{width:640,height:480,facingMode:'user'}},{video:true}];
+      fStream = await getFirstWorking(constraints);
+      fVid.srcObject=fStream;
+      await fVid.play();
+      sizeOverlay(fVid,fCan);
+      fRun=true; fPrev=null; fScore=0;
+      $('#faceStatus').textContent='Camera started — keep face centered and still';
+      faceLoop();
+    }catch(e){ $('#faceStatus').textContent='Cannot start camera: '+e.message; }
+  };
+  $('#stopFaceCamera').onclick = async ()=>{ await stopStream(fStream); fRun=false; fCtx.clearRect(0,0,fCan.width,fCan.height); $('#faceStatus').textContent='Camera stopped'; };
+  $('#faceReset').onclick = async ()=>{ fScore=0; fPrev=null; $('#faceStatus').textContent='Reset done. Start camera again if needed.'; };
+  $('#faceSubmit').onclick = ()=>{ if(fScore>=FACE_OK){ grant(); } else { alert('Face not verified yet'); } };
+  function faceLoop(){
+    if(!fRun) return;
+    try{
+      fCtx.drawImage(fVid,0,0,fCan.width,fCan.height);
+      const img = fCtx.getImageData(0,0,fCan.width,fCan.height);
+      const skin = estimateSkinRatio(img.data);
+      const motion = fPrev ? estimateMotion(img.data,fPrev) : 0;
+      fPrev = new Uint8ClampedArray(img.data);
+      const ok = skin>0.08 && motion>0.005 && motion<0.06;
+      drawFaceHUD(ok);
+      fScore = ok ? fScore+1 : Math.max(0,fScore-1);
+      if(fScore>=FACE_OK){ $('#faceStatus').textContent='Face verified — you can Submit'; }
+      else $('#faceStatus').textContent=`Align your face — progress ${fScore}/${FACE_OK}`;
+    }catch{}
+    requestAnimationFrame(faceLoop);
+  }
+  function drawFaceHUD(ok){
+    fCtx.strokeStyle = ok?'#4ecdc4':'#ff6b9d'; fCtx.lineWidth=3; fCtx.strokeRect(40,40,fCan.width-80,fCan.height-80);
+    fCtx.fillStyle = '#4ecdc4'; fCtx.beginPath(); fCtx.arc(fCan.width/2-30, fCan.height/2-20, 6, 0, Math.PI*2); fCtx.fill();
+    fCtx.beginPath(); fCtx.arc(fCan.width/2+30, fCan.height/2-20, 6, 0, Math.PI*2); fCtx.fill();
+  }
+
+  /* ===== Shared camera helpers ===== */
+  function sizeOverlay(video, canvas){
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const vr = video.getBoundingClientRect();
+    canvas.style.width = vr.width+'px';
+    canvas.style.height = vr.height+'px';
+  }
+  async function stopStream(stream){ if(stream){ stream.getTracks().forEach(t=>t.stop()); } }
+  async function getFirstWorking(list){
+    let lastErr;
+    for(const c of list){ try{ return await navigator.mediaDevices.getUserMedia(c); } catch(e){ lastErr=e; } }
+    throw lastErr || new Error('No camera');
+  }
+  function estimateSkinRatio(data){
+    let skin=0, total=data.length/4;
+    for(let i=0;i<data.length;i+=4){
+      const r=data[i], g=data[i+1], b=data[i+2];
+      if(r>95 && g>40 && b>20 && (Math.max(r,g,b)-Math.min(r,g,b)>15) && Math.abs(r-g)>15 && r>g && r>b) skin++;
+    }
+    return skin/total;
+  }
+  function estimateMotion(now, prev){
+    let diff=0, total=now.length/4;
+    for(let i=0;i<now.length;i+=4){
+      const d = Math.abs(now[i]-prev[i])+Math.abs(now[i+1]-prev[i+1])+Math.abs(now[i+2]-prev[i+2]);
+      if(d>35) diff++;
+    }
+    return diff/total;
+  }
+  function randColor(){ return ['#ff6b9d','#4ecdc4','#45b7d1','#96ceb4','#feca57'][Math.floor(Math.random()*5)]; }
+
+  /* ===== Dice ===== */
+  $('#rollDice').onclick=()=>{ const a=1+Math.random()*6|0, b=1+Math.random()*6|0; $('#diceView').textContent = '🎲 '+a+'  🎲 '+b; $('#diceMsg').textContent=(a+b===7?'Seven! You can submit.':'Try again.'); };
+  $('#diceSubmit').onclick=()=>{ const txt=$('#diceView').textContent; const nums = (txt.match(/\d+/g)||[]).map(Number); if(nums.length===2 && nums[0]+nums[1]===7) grant(); else alert('Roll a 7 first'); };
+
+  /* ===== Tic Tac Toe (quick bot) ===== */
+  const tttGrid = $('#tttGrid'); let board=Array(9).fill(null), turn='X';
+  for(let i=0;i<9;i++){ const c=document.createElement('button'); c.className='btn'; c.style.width='80px'; c.style.height='80px'; c.dataset.i=i;
+    c.onclick=()=>move(i,c); tttGrid.appendChild(c); }
+  function move(i,btn){ if(board[i]||winner(board)) return; board[i]='X'; btn.textContent='X'; if(winner(board)){ $('#tttMsg').textContent='You win!'; setTimeout(grant,300); return; }
+    bot(); }
+  function bot(){ const i = board.findIndex(v=>!v); if(i>=0){ board[i]='O'; tttGrid.children[i].textContent='O'; if(winner(board)) $('#tttMsg').textContent='Bot wins!'; } }
+  function winner(b){ const W=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]]; return W.some(([a,b2,c])=>b[a]&&b[a]===b[b2]&&b[a]===b[c]); }
+  $('#tttReset').onclick=()=>{ board=Array(9).fill(null); [...tttGrid.children].forEach(c=>c.textContent=''); $('#tttMsg').textContent='You are X. First to 3 in a row wins.'; };
+  $('#tttSubmit').onclick=()=>{ if(winner(board)) grant(); else alert('Win before submitting'); };
+
+  /* ===== Rock-Paper-Scissors ===== */
+  $$('.rps').forEach(b=>b.onclick=()=>{ const you=b.dataset.move; const opts=['rock','paper','scissors']; const bot=opts[Math.random()*3|0];
+    let res = (you===bot)?'Draw':(you==='rock'&&bot==='scissors'||you==='paper'&&bot==='rock'||you==='scissors'&&bot==='paper')?'You win!':'You lose!';
+    $('#rpsMsg').textContent=`You: ${you} | Bot: ${bot} — ${res}`; if(res==='You win!') setTimeout(grant,300);
+  });
+
+  /* ===== Symbols (last symbol must match) ===== */
+  const SYMS = ['🔴','🟠','🟡','🟢','🔵','🟣','🟤','⚪','⚫','⭐','💠','🔶','🔷'];
+  let lastSymbol=null;
+  function newSymbols(){ const list=[...SYMS].sort(()=>Math.random()-0.5).slice(5); lastSymbol=list[list.length-1]; $('#symShow').textContent='Last: '+lastSymbol; const box=$('#symChoices'); box.innerHTML=''; list.forEach(s=>{ const btn=document.createElement('button'); btn.className='btn'; btn.textContent=s; btn.onclick=()=>{ if(s===lastSymbol){ grant(); } else { $('#symMsg').textContent='Wrong symbol — try again.'; } }; box.appendChild(btn); }); }
+  $('#symbols').addEventListener('click',e=>{ if(e.target.id==='symReset') newSymbols(); });
+  $('#symReset').onclick=newSymbols; newSymbols();
+
+  /* ===== Particles ===== */
+  const pCanvas=$('#particleCanvas'), pCtx=pCanvas.getContext('2d'); let parts=[], pm={x:0,y:0};
+  function sizeP(){ pCanvas.width=innerWidth; pCanvas.height=innerHeight; }
+  sizeP(); addEventListener('resize', sizeP);
+  function mk(){ parts=[...Array(100)].map(()=>({x:Math.random()*pCanvas.width,y:Math.random()*pCanvas.height,vx:(Math.random()-.5)*.6,vy:(Math.random()-.5)*.6,s:Math.random()*2+1,o:Math.random()*.5+.25,c:randColor()})); }
+  mk(); addEventListener('mousemove',e=>{pm.x=e.clientX; pm.y=e.clientY;});
+  (function step(){ pCtx.fillStyle='rgba(0,0,0,.08)'; pCtx.fillRect(0,0,pCanvas.width,pCanvas.height);
+    parts.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; const dx=pm.x-p.x, dy=pm.y-p.y, d=Math.hypot(dx,dy); if(d<120){const f=(120-d)/120; p.vx+=dx/d*f*.012; p.vy+=dy/d*f*.012} p.vx*=.992; p.vy*=.992;
+      if(p.x<0)p.x=pCanvas.width; if(p.x>pCanvas.width)p.x=0; if(p.y<0)p.y=pCanvas.height; if(p.y>pCanvas.height)p.y=0;
+      pCtx.beginPath(); pCtx.globalAlpha=p.o; pCtx.fillStyle=p.c; pCtx.arc(p.x,p.y,p.s,0,Math.PI*2); pCtx.fill();
+    });
+    for(let i=0;i<parts.length;i++) for(let j=i+1;j<parts.length;j++){ const a=parts[i], b=parts[j]; const L=Math.hypot(a.x-b.x,a.y-b.y); if(L<78){ pCtx.beginPath(); pCtx.globalAlpha=(78-L)/78*.18; pCtx.strokeStyle=a.c; pCtx.lineWidth=1; pCtx.moveTo(a.x,a.y); pCtx.lineTo(b.x,b.y); pCtx.stroke(); } }
+    pCtx.globalAlpha=1; requestAnimationFrame(step);
+  })();
+  </script>
+</body>
+</html>
